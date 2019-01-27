@@ -242,7 +242,7 @@ class insertSectForm(QWidget):
   NOTE: It's also possible to create customized 2D profiles and drag-and-drop
   them inside this group."
   '''
-  def __init__(self,winTitle='Insert section', icon='flamingo.svg'):
+  def __init__(self,winTitle='Insert Section', icon='flamingo.svg'):
     '''
     __init__(self,winTitle='Title',icon='filename.svg')
     '''
@@ -255,41 +255,52 @@ class insertSectForm(QWidget):
     Icon=QIcon()
     Icon.addFile(iconPath)
     self.setWindowIcon(Icon) 
+    
+    self.currentSType = "" # not determined, yet
+    
     self.mainHL=QHBoxLayout()
     self.setLayout(self.mainHL)
+    
+    # setup first column
     self.firstCol=QWidget()
     self.firstCol.setLayout(QVBoxLayout())
-    self.mainHL.addWidget(self.firstCol)
-    self.SType='IPE'
-    self.currentRatingLab=QLabel('Section: '+self.SType)
-    self.firstCol.layout().addWidget(self.currentRatingLab)
-    self.sizeList=QListWidget()
-    self.sizeList.setMaximumWidth(120)
-    self.firstCol.layout().addWidget(self.sizeList)
-    self.sectDictList=[]
-    self.fileList=listdir(join(dirname(abspath(__file__)),"tables"))
-    self.fillSizes()
-    self.PRatingsList=[s.lstrip("Section_").rstrip(".csv") for s in self.fileList if s.startswith("Section")]
-    self.secondCol=QWidget()
+    self.STypeLabel = QLabel("Section Types:")  # doesn't change (i.e. we don't really need access to it
+    self.firstCol.layout().addWidget(self.STypeLabel)
+    self.typeList = QListWidget()
+    self.typeList.setMaximumWidth(100)
+    self.typeList.itemClicked.connect(self.changeType)
+    self.firstCol.layout().addWidget(self.typeList)
+    self.mainHL.addWidget(self.firstCol)   # adding the first column 
+    
+    # second column
+    self.secondCol = QWidget()
     self.secondCol.setLayout(QVBoxLayout())
-    self.lab1=QLabel('Section types:')
-    self.secondCol.layout().addWidget(self.lab1)
-    self.ratingList=QListWidget()
-    self.ratingList.setMaximumWidth(100)
-    self.ratingList.addItems(self.PRatingsList)
-    self.ratingList.itemClicked.connect(self.changeRating)
-    self.ratingList.setCurrentRow(0)
-    self.secondCol.layout().addWidget(self.ratingList)
-    self.btn1=QPushButton('Insert')
-    self.btn1.setMaximumWidth(100)
-    self.btn1.clicked.connect(self.insert)
-    self.secondCol.layout().addWidget(self.btn1)
-    self.mainHL.addWidget(self.secondCol)
-    self.show()
+    self.currentRatingLabel = QLabel("Section: ")
+    self.secondCol.layout().addWidget(self.currentRatingLabel)
+    self.sizeList = QListWidget()
+    self.sizeList.setMaximumWidth(120)
+    self.sizeList.itemDoubleClicked.connect(self.insert) # is that windows specific ???
+    self.secondCol.layout().addWidget(self.sizeList)
+    
+    # insert button
+    self.insertButton=QPushButton('Insert')
+    self.insertButton.setMaximumWidth(100)
+    self.insertButton.clicked.connect(self.insert)
+    self.secondCol.layout().addWidget(self.insertButton)  # insert button is inserted at bottom of second column 
+    self.mainHL.addWidget(self.secondCol)         # finish second column 
+    
+    # now provide the data
+    self.sectionFileList=[]
+    self.sectionFileList=listdir(join(dirname(abspath(__file__)), "tables"))
+    self.STypeList = [f.lstrip("Section_").rstrip(".csv") for f in self.sectionFileList if f.startswith("Section_")]
+    self.typeList.addItems(self.STypeList)
+    
+    self.show() # show it to the world
+   
   def fillSizes(self):
     self.sizeList.clear()
-    for fileName in self.fileList:
-      if fileName=='Section_'+self.SType+'.csv':
+    for fileName in self.sectionFileList:
+      if fileName=='Section_'+self.currentSType+'.csv':
         f=open(join(dirname(abspath(__file__)),"tables",fileName),'r')
         reader=csv.DictReader(f,delimiter=';')
         self.sectDictList=[x for x in reader]
@@ -297,10 +308,14 @@ class insertSectForm(QWidget):
         for row in self.sectDictList:
           s=row['SSize']
           self.sizeList.addItem(s)
-  def changeRating(self,item):
-    self.SType=item.text()
-    self.currentRatingLab.setText('Section: '+self.SType)
+          
+#  def changeRating(self,item):
+  def changeType(self, item):
+    self.currentSType=item.text()
+    self.currentRatingLabel.setText('Section: '+self.currentSType)
     self.fillSizes()
+    
+    
   def insert(self):      # insert the section
     result=FreeCAD.ActiveDocument.findObjects("App::DocumentObjectGroup","Profiles_set")
     if result:
@@ -314,6 +329,7 @@ class insertSectForm(QWidget):
       else:
         s=ArchProfile.makeProfile([0,'SECTION',prop['SSize']+'-000',prop['stype'],float(prop['W']),float(prop['H']),float(prop['ta']),float(prop['tf'])])
       group.addObject(s)
+      makeStructure(s) #TODO: GUT
     FreeCAD.activeDocument().recompute()
 
 from frameForms import prototypeDialog
